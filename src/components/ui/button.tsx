@@ -16,12 +16,19 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        hero: "bg-accent text-accent-foreground font-bold shadow-lift hover:bg-accent/90 hover:-translate-y-0.5 transition-all",
+        photo:
+          "border border-on-photo/70 bg-overlay/30 text-on-photo font-bold backdrop-blur-sm hover:bg-on-photo hover:text-foreground",
+        tina: "bg-tina text-tina-foreground shadow-sm hover:bg-tina/90",
+        sauna: "bg-sauna text-sauna-foreground shadow-sm hover:bg-sauna/90",
+        moss: "bg-moss text-primary-foreground shadow-sm hover:bg-moss/90",
       },
       size: {
         default: "h-9 px-4 py-2",
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
         icon: "h-9 w-9",
+        xl: "h-12 rounded-lg px-6 text-base",
       },
     },
     defaultVariants: {
