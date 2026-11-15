@@ -34,6 +34,8 @@ export interface TermasState {
 
 const SERVER_STATE: TermasState = { ready: false, bookings: [], settings: defaultSettings() };
 let cache: TermasState | null = null;
+/** Migración en curso de una clave antigua en texto plano; el login espera a que termine. */
+let pendingPasswordMigration: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 function readJSON<T>(key: string): T | null {
@@ -73,9 +75,11 @@ function load(): TermasState {
   if (legacyPlain !== undefined) {
     persist({ bookings: storedBookings, settings });
     if (typeof legacyPlain === "string" && legacyPlain && !isPasswordHash(rest.adminPasswordHash)) {
-      void hashPassword(legacyPlain).then((h) =>
-        update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPasswordHash: h } })),
-      );
+      pendingPasswordMigration = hashPassword(legacyPlain)
+        .then((h) => update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPasswordHash: h } })))
+        .finally(() => {
+          pendingPasswordMigration = null;
+        });
     }
   }
   return { ready: true, bookings: storedBookings, settings };
@@ -262,6 +266,8 @@ export function useAdminSession(): boolean {
 }
 
 export async function loginAdmin(password: string): Promise<boolean> {
+  getSnapshot();
+  if (pendingPasswordMigration) await pendingPasswordMigration;
   const stored = getSnapshot().settings.adminPasswordHash;
   if (!(await verifyPassword(password, stored))) return false;
   window.sessionStorage.setItem(SESSION_KEY, stored.hash);
