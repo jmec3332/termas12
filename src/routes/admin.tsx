@@ -89,17 +89,16 @@ function AdminPanel() {
         <div className="mb-4 flex justify-end">
           <LogoutButton />
         </div>
+        <PhoneSearch />
         <Tabs defaultValue="grilla">
           <div className="-mx-4 overflow-x-auto px-4">
             <TabsList className="h-auto w-max">
               <TabsTrigger value="grilla" className="py-1.5">Grilla del día</TabsTrigger>
-              <TabsTrigger value="buscar" className="py-1.5">Buscar por celular</TabsTrigger>
               <TabsTrigger value="precios" className="py-1.5">Temporada y precios</TabsTrigger>
               <TabsTrigger value="ajustes" className="py-1.5">Clave y datos</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="grilla" className="mt-5"><DayGrid /></TabsContent>
-          <TabsContent value="buscar" className="mt-5"><PhoneSearch /></TabsContent>
           <TabsContent value="precios" className="mt-5"><PricesPanel /></TabsContent>
           <TabsContent value="ajustes" className="mt-5"><SettingsPanel /></TabsContent>
         </Tabs>
@@ -136,7 +135,7 @@ function DayGrid() {
         <Input type="date" aria-label="Fecha" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="w-44" />
         <Button variant="outline" size="icon" aria-label="Día siguiente" onClick={() => shift(1)}><ChevronRight /></Button>
         <Button variant="ghost" onClick={() => setDate(toISODate(new Date()))}>Hoy</Button>
-        <p className="w-full text-sm font-bold capitalize text-muted-foreground sm:w-auto">{formatDateLong(date)}</p>
+        <p className="w-full text-sm font-bold text-muted-foreground sm:w-auto">{formatDateLong(date)}</p>
       </div>
 
       <MaintenancePanel date={date} />
@@ -279,11 +278,11 @@ function BookingRow({ booking: b, turn, affected }: { booking: Booking; turn: Tu
   return (
     <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 py-2", affected && "rounded-md bg-destructive-soft px-2")}>
       <div className="min-w-0 flex-1">
-        <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold">
+        <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold">
           {turn !== "piscinas" && <Badge variant={turn}>{turn === "tina" ? `Tina ×${units}` : `Sauna ×${units}`}</Badge>}
           <span>{b.code}</span>
           <span className="font-normal text-muted-foreground">· {b.name}</span>
-        </p>
+        </div>
         <p className="text-xs text-muted-foreground">
           {PACKAGES[b.packageId].name} · {b.people} pers.{b.kids ? ` + ${b.kids} menor` : ""} · {formatPhone(b.phone)}
           {affected && <strong className="ml-1 text-destructive">· Afectada por mantención</strong>}
@@ -321,9 +320,13 @@ function PhoneSearch() {
   const results = query ? bookings.filter((b) => b.phone === query).sort((a, b) => b.date.localeCompare(a.date)) : [];
 
   return (
-    <div className="space-y-4">
+    <section aria-label="Buscar reserva por celular" className="mb-6 rounded-2xl border-2 border-accent/50 bg-card p-4 shadow-card">
+      <h2 className="flex items-center gap-2 text-base font-bold">
+        <Search className="size-4" /> Buscar reserva por celular
+      </h2>
+      <p className="text-xs text-muted-foreground">Si el número está en la lista de reservas, se muestran aquí con opción de cancelar (más de 24 horas antes).</p>
       <form
-        className="flex max-w-md flex-col gap-2 sm:flex-row"
+        className="mt-3 flex max-w-lg flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault();
           const p = normalizePhone(phone);
@@ -338,39 +341,65 @@ function PhoneSearch() {
       >
         <div className="flex flex-1">
           <span className="inline-flex items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm font-bold">+56</span>
-          <Input type="tel" inputMode="numeric" aria-label="Celular" placeholder="9 1234 5678" className="rounded-l-none" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input
+            type="tel"
+            inputMode="numeric"
+            aria-label="Celular a buscar"
+            placeholder="9 1234 5678"
+            className="rounded-l-none"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
         </div>
         <Button type="submit"><Search /> Buscar</Button>
+        {query && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setQuery(null);
+              setPhone("");
+            }}
+          >
+            Limpiar
+          </Button>
+        )}
       </form>
-      {error && <p className="text-sm font-bold text-destructive">{error}</p>}
-      {query && (
-        <p className="text-sm text-muted-foreground">
-          {results.length} reserva{results.length === 1 ? "" : "s"} para {formatPhone(query)}
-        </p>
+      {error && <p className="mt-2 text-sm font-bold text-destructive">{error}</p>}
+      {query && results.length === 0 && (
+        <p className="mt-3 rounded-lg bg-secondary p-3 text-sm font-bold">No hay reservas con el celular {formatPhone(query)}.</p>
       )}
-      <div className="grid gap-3 md:grid-cols-2">
-        {results.map((b) => (
-          <article key={b.id} className="rounded-2xl border bg-card p-4 shadow-card">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-display text-lg font-black">{b.code}</p>
-                <p className="text-sm capitalize text-muted-foreground">{formatDateLong(b.date)}</p>
-              </div>
-              <Badge variant={b.status === "cancelada" ? "alert" : "moss"}>{b.status === "cancelada" ? "Cancelada" : "Confirmada"}</Badge>
-            </div>
-            <p className="mt-2 text-sm">
-              <strong>{PACKAGES[b.packageId].name}</strong> · {b.people} pers. · {formatCLP(b.total)}
-            </p>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {b.tinaHour !== null && <Badge variant="tina">Tina {formatHour(b.tinaHour)}</Badge>}
-              {b.saunaHour !== null && <Badge variant="sauna">Sauna {formatHour(b.saunaHour)}</Badge>}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">{b.name}</p>
-            <div className="mt-3"><CancelAction booking={b} size="sm" /></div>
-          </article>
-        ))}
-      </div>
-    </div>
+      {results.length > 0 && (
+        <>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {results.length} reserva{results.length === 1 ? "" : "s"} para <strong className="text-foreground">{formatPhone(query ?? "")}</strong>
+          </p>
+          <div className="mt-2 grid gap-3 md:grid-cols-2">
+            {results.map((b) => (
+              <article key={b.id} className="rounded-xl border bg-background p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-display text-lg font-black">{b.code}</p>
+                    <p className="text-sm text-muted-foreground">{formatDateLong(b.date)}</p>
+                  </div>
+                  <Badge variant={b.status === "cancelada" ? "alert" : "moss"}>{b.status === "cancelada" ? "Cancelada" : "Confirmada"}</Badge>
+                </div>
+                <p className="mt-2 text-sm">
+                  <strong>{PACKAGES[b.packageId].name}</strong> · {b.people} pers.{b.kids ? ` + ${b.kids} menor` : ""} · {formatCLP(b.total)}
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {b.tinaHour !== null && <Badge variant="tina">Tina {formatHour(b.tinaHour)}</Badge>}
+                  {b.saunaHour !== null && <Badge variant="sauna">Sauna {formatHour(b.saunaHour)}</Badge>}
+                  {b.tinaHour === null && b.saunaHour === null && <Badge variant="moss">Solo piscinas</Badge>}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{b.name}</p>
+                <div className="mt-3"><CancelAction booking={b} size="sm" /></div>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

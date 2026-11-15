@@ -165,6 +165,20 @@ describe("estadísticas", () => {
     expect(years.totals.facturacion).toBe(92000);
   });
 
+  it("cuenta unidades: 1 tina por persona y 2 saunas para 5 o 6 personas", () => {
+    const list = [
+      booking({ date: "2026-12-01", packageId: "tina", people: 4, tinaHour: 11, saunaHour: null }),
+      booking({ date: "2026-12-01", packageId: "sauna", people: 5, tinaHour: null, saunaHour: 12 }),
+      booking({ date: "2026-12-02", packageId: "completo", people: 2, tinaHour: 10, saunaHour: 11 }),
+      booking({ date: "2026-12-02", packageId: "tina", people: 3, status: "cancelada" }),
+    ];
+    const { totals, buckets } = aggregate(list, "dia", { year: 2026, month: 11 });
+    expect(totals.tinas).toBe(6);
+    expect(totals.saunas).toBe(3);
+    expect(totals.canceladas).toBe(1);
+    expect(buckets[0]).toMatchObject({ tinas: 4, saunas: 2, reservas: 2 });
+  });
+
   it("la suma de los días coincide con el total del mes", () => {
     const { bookings } = buildSampleData(new Date(2026, 10, 14, 12), DEFAULT_PRICES);
     const days = aggregate(bookings, "dia", { year: 2026, month: 9 });

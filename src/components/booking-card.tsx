@@ -44,7 +44,7 @@ export function BookingCard({ booking, footer }: { booking: Booking; footer?: Re
       <dl className="grid gap-3 px-5 py-4 text-sm sm:grid-cols-2">
         <Item label="Paquete">{PACKAGES[booking.packageId].name}</Item>
         <Item label="Fecha">
-          <span className="capitalize">{formatDateLong(booking.date)}</span>
+          {formatDateLong(booking.date)}
         </Item>
         <Item label="Grupo">
           {booking.people} {booking.people === 1 ? "persona" : "personas"}

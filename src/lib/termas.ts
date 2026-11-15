@@ -313,13 +313,20 @@ export function formatTurn(kind: ResourceKind, h: number): string {
   return `${formatHour(h)} – ${end}`;
 }
 
+function capitalizeFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** "Martes, 17 de noviembre de 2026" (solo la primera letra en mayúscula). */
 export function formatDateLong(iso: string): string {
-  return parseISODate(iso).toLocaleDateString("es-CL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return capitalizeFirst(
+    parseISODate(iso).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+  );
+}
+
+/** "Martes, 17 de noviembre" */
+export function formatDateShort(iso: string): string {
+  return capitalizeFirst(parseISODate(iso).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }));
 }
 
 export function formatCLP(n: number): string {

@@ -13,6 +13,7 @@ import {
   addDays,
   BOOKING_WINDOW_DAYS,
   formatCLP,
+  formatDateShort,
   formatHour,
   formatTurn,
   MAX_KIDS,
@@ -263,7 +264,7 @@ function ReservarPage() {
         {step === 2 && pkg && (
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              <span className="capitalize">{parseISODate(activeDate).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}</span>
+              {formatDateShort(activeDate)}
               {" · "}{people} {people === 1 ? "persona" : "personas"}
             </p>
             {!pkg.needsTina && !pkg.needsSauna && (
@@ -346,9 +347,7 @@ function ReservarPage() {
             {pkg && (
               <div className="rounded-xl bg-secondary p-3 text-sm">
                 <p className="font-bold">{pkg.name}</p>
-                <p className="capitalize text-muted-foreground">
-                  {parseISODate(activeDate).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
-                </p>
+                <p className="text-muted-foreground">{formatDateShort(activeDate)}</p>
                 <div className="mt-1 flex flex-wrap gap-x-3 text-muted-foreground">
                   {pkg.needsTina && tinaHour !== null && <span className="font-bold text-tina">Tina {formatTurn("tina", tinaHour)}</span>}
                   {pkg.needsSauna && saunaHour !== null && <span className="font-bold text-sauna-foreground">Sauna {formatTurn("sauna", saunaHour)}</span>}

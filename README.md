@@ -1,26 +1,66 @@
-# Termas12
+# Termas Punulaf · Sistema de reserva de tinas y saunas
 
-Implement exactly the screenshot and nothing else
+Reservas en línea para Termas Punulaf (Chile): 12 tinas individuales, 5 saunas y piscinas libres.
+Todo funciona en el navegador con `localStorage`: no hay servidor, base de datos ni servicios externos.
 
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://termas12.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/b824e1b9-c470-4154-976c-4cf316e20e4b).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Cómo arrancar
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+npm install      # o bun install
+npm run dev      # abre http://localhost:8080
+npm test         # pruebas de las reglas de negocio
 ```
+
+Páginas: `/` inicio · `/reservar` · `/mi-visita` · `/graficos` · `/admin`.
+
+## Datos simulados
+
+La primera vez que se abre la app se generan datos ficticios de prueba (`src/lib/seed.ts`):
+
+- Reservas de los últimos ~14 meses y de las próximas 3 semanas, con cancelaciones y asistencia marcada.
+- Hoy a las 12:00 las tinas quedan sobreocupadas a propósito (tinas 11 y 12 y sauna 5 en mantención) para ver la alerta roja en `/admin`.
+- Reservas conocidas para probar «Mi visita»: `PUN-2026` + `9 1234 5678` (cancelable) y `PUN-HOY1` + `9 8765 4321` (hoy, no cancelable).
+- El teléfono del recinto (`+56 9 4567 8901`) es ficticio.
+
+Claves en `localStorage`: `termas-punulaf:bookings` y `termas-punulaf:settings`.
+
+### Reiniciar los datos
+
+- Desde `/admin` → «Clave y datos»: **Eliminar datos de ejemplo** (borra solo las reservas de prueba) o **Recargar datos de ejemplo**.
+- Reinicio total: borrar esas dos claves en las herramientas del navegador (Application → Local Storage) y recargar. Vuelven precios, clave inicial y datos de ejemplo.
+
+## Clave de administración
+
+- La clave inicial es `termas2026` y protege `/admin` y `/graficos`.
+- Se cambia desde `/admin` → «Clave y datos» → **Grabar**. Queda guardada en el navegador.
+- La clave nunca se guarda en texto plano: solo un hash PBKDF2-SHA256 con sal (`src/lib/password.ts`).
+- Para cambiar la clave **inicial** en el código, generar un hash nuevo y reemplazar `DEFAULT_ADMIN_PASSWORD_HASH` en `src/lib/termas.ts`:
+
+  ```sh
+  python3 -c "import hashlib,os;s=os.urandom(16);print(s.hex(), hashlib.pbkdf2_hmac('sha256',b'NUEVA_CLAVE',s,150000,32).hex())"
+  ```
+
+  El primer valor va en `salt` y el segundo en `hash`.
+
+## Cómo se evita que se pisen los turnos
+
+Las reglas están en `src/lib/termas.ts` (funciones puras, con pruebas en `src/lib/termas.test.ts`):
+
+- **Tinas:** 1 tina por persona (los menores de 4 años no cuentan y comparten la tina del adulto). Un grupo de 4 necesita 4 tinas libres en ese horario.
+- **Saunas:** 1 sauna para 1 a 4 personas; 2 saunas para 5 o 6.
+- Turnos cada hora en punto de 10:00 a 17:00 (tina 45 min, sauna 30 min), para terminar antes del cierre a las 18:00.
+- Antes de mostrar un horario y otra vez al confirmar, `validateRequest` suma las unidades de las reservas confirmadas de ese día y hora y lo compara con el cupo disponible. Si no alcanza, el horario aparece «Sin cupo» y la reserva no se crea.
+- **Día Completo:** tina y sauna deben ir en horas distintas; al elegir la tina a las 11:00 el sauna de las 11:00 queda bloqueado con el motivo.
+- Las reservas canceladas no ocupan cupo.
+
+## Cómo impacta el mantenimiento en el cupo
+
+En `/admin` → «Grilla del día» se marcan unidades fuera de servicio para una fecha. El cupo de ese día pasa a ser `unidades totales − fuera de servicio` en todos los turnos:
+
+- Las nuevas reservas solo ven el cupo reducido.
+- Si ya había más unidades reservadas que las operativas, el turno se marca en rojo y se listan las reservas afectadas (código, nombre y celular) para contactarlas.
+
+## Cancelaciones
+
+- Más de 24 horas antes del primer turno (o de las 10:00 si es solo piscinas): se cancela en línea y los turnos se liberan.
+- Menos de 24 horas: no se libera y se muestra el aviso de contactar al recinto.
