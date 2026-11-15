@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Lock } from "lucide-react";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/page-header";
-import { adminLogin } from "@/lib/admin-auth.functions";
+import { adminLogin, getAdminStatus } from "@/lib/admin-auth.functions";
 import { useTermas } from "@/lib/store";
 
 /**
@@ -21,6 +21,29 @@ export function AdminGate({ title, authed, children }: { title: string; authed: 
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const checkStatus = useServerFn(getAdminStatus);
+
+  // Si la sesión vence o se cierra en otra pestaña, el panel se vuelve a bloquear sin esperar a navegar.
+  useEffect(() => {
+    if (!authed) return;
+    const recheck = async () => {
+      try {
+        const res = await checkStatus();
+        if (!res.authed) await router.invalidate();
+      } catch {
+        // Sin conexión: se reintenta en el próximo foco o intervalo.
+      }
+    };
+    const onVisible = () => document.visibilityState === "visible" && void recheck();
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisible);
+    const id = window.setInterval(recheck, 5 * 60 * 1000);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(id);
+    };
+  }, [authed, checkStatus, router]);
 
   if (authed) return ready ? <>{children}</> : <Loading />;
 
