@@ -1,22 +1,28 @@
 import { useState, type ReactNode } from "react";
+import { useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/page-header";
-import { loginAdmin, useAdminSession, useTermas } from "@/lib/store";
+import { adminLogin } from "@/lib/admin-auth.functions";
+import { useTermas } from "@/lib/store";
 
-/** Pide la clave de administración (la misma para /admin y /graficos) antes de mostrar el contenido. */
-export function AdminGate({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * Muestra el contenido solo si el servidor confirmó la sesión de administración
+ * (`authed` viene del beforeLoad de la ruta). La clave se verifica en el servidor.
+ */
+export function AdminGate({ title, authed, children }: { title: string; authed: boolean; children: ReactNode }) {
   const { ready } = useTermas();
-  const authed = useAdminSession();
+  const router = useRouter();
+  const login = useServerFn(adminLogin);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
 
-  if (!ready) return <Loading />;
-  if (authed) return <>{children}</>;
+  if (authed) return ready ? <>{children}</> : <Loading />;
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
@@ -24,11 +30,22 @@ export function AdminGate({ title, children }: { title: string; children: ReactN
         className="rounded-2xl border bg-card p-6 shadow-card"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (!password) return setError("Ingresa la clave.");
           setChecking(true);
-          const ok = await loginAdmin(password);
-          setChecking(false);
-          if (ok) setError("");
-          else setError("Clave incorrecta. Revisa e intenta de nuevo.");
+          try {
+            const res = await login({ data: { password } });
+            if (res.ok) {
+              setError("");
+              setPassword("");
+              await router.invalidate();
+            } else {
+              setError("Clave incorrecta. Revisa e intenta de nuevo.");
+            }
+          } catch {
+            setError("No se pudo verificar la clave. Intenta de nuevo.");
+          } finally {
+            setChecking(false);
+          }
         }}
       >
         <div className="mb-4 grid size-11 place-items-center rounded-full bg-primary text-primary-foreground">

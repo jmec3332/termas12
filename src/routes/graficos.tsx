@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { PageHeader } from "@/components/page-header";
 import { useTermas } from "@/lib/store";
 import { aggregate, formatCLP, MONTHS_LONG, type Granularity } from "@/lib/termas";
+import { getAdminStatus } from "@/lib/admin-auth.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/graficos")({
@@ -21,12 +22,18 @@ export const Route = createFileRoute("/graficos")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: () => (
-    <AdminGate title="Gráficos">
+  beforeLoad: async () => ({ adminAuthed: (await getAdminStatus()).authed }),
+  component: GraficosRoute,
+});
+
+function GraficosRoute() {
+  const { adminAuthed } = Route.useRouteContext();
+  return (
+    <AdminGate title="Gráficos" authed={adminAuthed}>
       <Graficos />
     </AdminGate>
-  ),
-});
+  );
+}
 
 const GRANULARITIES: { id: Granularity; label: string }[] = [
   { id: "dia", label: "Por día" },

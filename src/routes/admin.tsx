@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AlertTriangle, ChevronLeft, ChevronRight, Flame, KeyRound, Save, Search, Trash2, RotateCcw, Waves, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
+import { useServerFn } from "@tanstack/react-start";
+
 import { AdminGate } from "@/components/admin-gate";
 import { CancelAction } from "@/components/cancel-action";
 import { LogoutButton } from "@/components/logout-button";
@@ -26,7 +28,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   deleteSampleData,
   restoreSampleData,
-  setAdminPassword,
   setAttendance,
   setPackagePrices,
   setSeason,
@@ -57,6 +58,7 @@ import {
   type Season,
   type TurnKey,
 } from "@/lib/termas";
+import { changeAdminPassword, getAdminStatus } from "@/lib/admin-auth.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
@@ -71,12 +73,18 @@ export const Route = createFileRoute("/admin")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: () => (
-    <AdminGate title="Administración">
+  beforeLoad: async () => ({ adminAuthed: (await getAdminStatus()).authed }),
+  component: AdminRoute,
+});
+
+function AdminRoute() {
+  const { adminAuthed } = Route.useRouteContext();
+  return (
+    <AdminGate title="Administración" authed={adminAuthed}>
       <AdminPanel />
     </AdminGate>
-  ),
-});
+  );
+}
 
 function AdminPanel() {
   const { settings } = useTermas();
@@ -487,6 +495,8 @@ function SettingsPanel() {
   const [pwd, setPwd] = useState("");
   const [pwd2, setPwd2] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const changePassword = useServerFn(changeAdminPassword);
   const sampleCount = bookings.filter((b) => b.sample).length;
 
   return (
@@ -500,11 +510,19 @@ function SettingsPanel() {
             e.preventDefault();
             if (pwd.trim().length < 6) return setError("La clave debe tener al menos 6 caracteres.");
             if (pwd !== pwd2) return setError("Las claves no coinciden.");
-            await setAdminPassword(pwd);
-            setError("");
-            setPwd("");
-            setPwd2("");
-            toast.success("Clave actualizada.");
+            setSaving(true);
+            try {
+              const res = await changePassword({ data: { password: pwd } });
+              if (!res.ok) return setError(res.error);
+              setError("");
+              setPwd("");
+              setPwd2("");
+              toast.success("Clave actualizada.");
+            } catch {
+              setError("No se pudo guardar la clave. Intenta de nuevo.");
+            } finally {
+              setSaving(false);
+            }
           }}
         >
           <div className="space-y-1">
@@ -516,7 +534,7 @@ function SettingsPanel() {
               <Label htmlFor="new-pwd2">Repetir clave</Label>
               <Input id="new-pwd2" type="password" autoComplete="new-password" value={pwd2} onChange={(e) => setPwd2(e.target.value)} />
             </div>
-            <Button type="submit"><Save /> Grabar</Button>
+            <Button type="submit" disabled={saving}><Save /> {saving ? "Grabando…" : "Grabar"}</Button>
           </div>
           {error && <p className="text-sm font-bold text-destructive">{error}</p>}
         </form>

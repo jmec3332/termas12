@@ -1,7 +1,7 @@
 # Termas Punulaf · Sistema de reserva de tinas y saunas
 
 Reservas en línea para Termas Punulaf (Chile): 12 tinas individuales, 5 saunas y piscinas libres.
-Todo funciona en el navegador con `localStorage`: no hay servidor, base de datos ni servicios externos.
+Los datos viven en el navegador con `localStorage`: no hay base de datos ni servicios externos. Lo único que corre en el servidor de la propia app es la verificación de la clave de administración.
 
 ## Cómo arrancar
 
@@ -32,15 +32,19 @@ Claves en `localStorage`: `termas-punulaf:bookings` y `termas-punulaf:settings`.
 ## Clave de administración
 
 - La clave inicial es `termas2026` y protege `/admin` y `/graficos`.
-- Se cambia desde `/admin` → «Clave y datos» → **Grabar**. Queda guardada en el navegador.
-- La clave nunca se guarda en texto plano: solo un hash PBKDF2-SHA256 con sal (`src/lib/password.ts`).
-- Para cambiar la clave **inicial** en el código, generar un hash nuevo y reemplazar `DEFAULT_ADMIN_PASSWORD_HASH` en `src/lib/termas.ts`:
+- **Se verifica en el servidor de la propia app** (funciones de servidor de TanStack Start, sin servicios externos):
+  - El navegador nunca recibe la clave ni su hash; solo envía lo que se escribe y el servidor responde si es correcta.
+  - La sesión es una cookie `HttpOnly` cifrada con el secreto `ADMIN_SESSION_SECRET` (8 horas). El código de la página no puede leerla ni falsificarla.
+  - Al entrar a `/admin` o `/graficos`, la ruta consulta al servidor si la sesión es válida antes de mostrar el panel.
+- Se cambia desde `/admin` → «Clave y datos» → **Grabar**. El servidor guarda el hash de la nueva clave en una cookie `HttpOnly` firmada (por navegador, igual que los datos) y las sesiones anteriores dejan de valer.
+- Para cambiar la clave **inicial** en el código, generar un hash nuevo y reemplazar `DEFAULT_ADMIN_PASSWORD_HASH` en `src/lib/admin-default.server.ts`:
 
   ```sh
-  python3 -c "import hashlib,os;s=os.urandom(16);print(s.hex(), hashlib.pbkdf2_hmac('sha256',b'NUEVA_CLAVE',s,150000,32).hex())"
+  python3 -c "import hashlib,os;s=os.urandom(16);print(s.hex(), hashlib.pbkdf2_hmac('sha256',b'NUEVA_CLAVE',s,100000,32).hex())"
   ```
 
-  El primer valor va en `salt` y el segundo en `hash`.
+  El primer valor va en `salt` y el segundo en `hash` (100.000 iteraciones, el máximo que admite el servidor).
+- Para volver a la clave inicial en un navegador: borrar las cookies del sitio.
 
 ## Cómo se evita que se pisen los turnos
 

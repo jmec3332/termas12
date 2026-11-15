@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from "react";
 
-import { hashPassword, isPasswordHash, verifyPassword } from "./password";
 import { buildSampleData } from "./seed";
 import {
   canCancel,
@@ -24,7 +23,6 @@ export const STORAGE_KEYS = {
   bookings: "termas-punulaf:bookings",
   settings: "termas-punulaf:settings",
 } as const;
-const SESSION_KEY = "termas-punulaf:admin-session";
 
 export interface TermasState {
   ready: boolean;
@@ -34,8 +32,6 @@ export interface TermasState {
 
 const SERVER_STATE: TermasState = { ready: false, bookings: [], settings: defaultSettings() };
 let cache: TermasState | null = null;
-/** Migración en curso de una clave antigua en texto plano; el login espera a que termine. */
-let pendingPasswordMigration: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 function readJSON<T>(key: string): T | null {
@@ -63,25 +59,19 @@ function load(): TermasState {
     return { ready: true, bookings: sample.bookings, settings };
   }
   const base = defaultSettings();
-  // Versiones anteriores guardaban la clave en texto plano: se elimina y se migra a hash.
-  const { adminPassword: legacyPlain, ...rest } = storedSettings as Partial<Settings> & { adminPassword?: unknown };
+  // La clave de administración vive solo en el servidor: se borra cualquier copia antigua del navegador.
+  const { adminPassword, adminPasswordHash, ...rest } = storedSettings as Partial<Settings> & {
+    adminPassword?: unknown;
+    adminPasswordHash?: unknown;
+  };
   const settings: Settings = {
     ...base,
     ...rest,
-    adminPasswordHash: isPasswordHash(rest.adminPasswordHash) ? rest.adminPasswordHash : base.adminPasswordHash,
     prices: { ...base.prices, ...(rest.prices ?? {}) },
     maintenance: rest.maintenance ?? {},
   };
-  if (legacyPlain !== undefined) {
-    persist({ bookings: storedBookings, settings });
-    if (typeof legacyPlain === "string" && legacyPlain && !isPasswordHash(rest.adminPasswordHash)) {
-      pendingPasswordMigration = hashPassword(legacyPlain)
-        .then((h) => update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPasswordHash: h } })))
-        .finally(() => {
-          pendingPasswordMigration = null;
-        });
-    }
-  }
+  if (adminPassword !== undefined || adminPasswordHash !== undefined) persist({ bookings: storedBookings, settings });
+  window.sessionStorage.removeItem("termas-punulaf:admin-session");
   return { ready: true, bookings: storedBookings, settings };
 }
 
@@ -201,14 +191,6 @@ export function setPackagePrices(packageId: PackageId, prices: Record<Season, nu
   }));
 }
 
-export async function setAdminPassword(password: string) {
-  const adminPasswordHash = await hashPassword(password);
-  update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPasswordHash } }));
-  // La sesión actual sigue activa con la clave nueva; las sesiones con la clave anterior caducan.
-  window.sessionStorage.setItem(SESSION_KEY, adminPasswordHash.hash);
-  emitSession();
-}
-
 export function toggleOutOfService(date: string, kind: ResourceKind, unit: number) {
   update((s) => {
     const day = s.settings.maintenance[date] ?? { tina: [], sauna: [] };
@@ -237,45 +219,4 @@ export function restoreSampleData() {
       bookings: [...s.bookings.filter((b) => !b.sample), ...sample.bookings],
     };
   });
-}
-
-// ---------- Sesión de administración (por pestaña) ----------
-// La sesión queda ligada al hash vigente: cambiar la clave invalida las sesiones anteriores.
-
-const sessionListeners = new Set<() => void>();
-
-function emitSession() {
-  sessionListeners.forEach((l) => l());
-}
-
-function subscribeSession(l: () => void) {
-  sessionListeners.add(l);
-  const unsubscribeStore = subscribe(l);
-  return () => {
-    sessionListeners.delete(l);
-    unsubscribeStore();
-  };
-}
-
-export function useAdminSession(): boolean {
-  return useSyncExternalStore(
-    subscribeSession,
-    () => window.sessionStorage.getItem(SESSION_KEY) === getSnapshot().settings.adminPasswordHash.hash,
-    () => false,
-  );
-}
-
-export async function loginAdmin(password: string): Promise<boolean> {
-  getSnapshot();
-  if (pendingPasswordMigration) await pendingPasswordMigration;
-  const stored = getSnapshot().settings.adminPasswordHash;
-  if (!(await verifyPassword(password, stored))) return false;
-  window.sessionStorage.setItem(SESSION_KEY, stored.hash);
-  emitSession();
-  return true;
-}
-
-export function logoutAdmin() {
-  window.sessionStorage.removeItem(SESSION_KEY);
-  emitSession();
 }

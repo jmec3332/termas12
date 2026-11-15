@@ -3,24 +3,12 @@
  * para poder probarlas y reutilizarlas desde cualquier pantalla.
  */
 
-import type { PasswordHash } from "./password";
-
 export type PackageId = "piscinas" | "tina" | "sauna" | "completo";
 export type ResourceKind = "tina" | "sauna";
 export type Season = "baja" | "alta";
 export type TurnKey = ResourceKind | "piscinas";
 export type Attendance = "llego" | "no_vino";
 
-/**
- * Hash (PBKDF2-SHA256) de la clave inicial de administración. La clave en texto plano
- * no vive en el código: está documentada en el README. Se cambia desde /admin y en
- * localStorage solo se guarda el hash.
- */
-export const DEFAULT_ADMIN_PASSWORD_HASH: PasswordHash = {
-  salt: "7f3c9a1e5b2d4c8f0a6e1d3b9c7f2a54",
-  iterations: 150_000,
-  hash: "ab19c753973ae6119270f6fea636d4a8fa5289efa5d137ee4365e1085b387e72",
-};
 
 export const TINA_UNITS = 12;
 export const SAUNA_UNITS = 5;
@@ -88,7 +76,6 @@ export type Maintenance = Record<string, Record<ResourceKind, number[]>>;
 export interface Settings {
   season: Season;
   prices: Prices;
-  adminPasswordHash: PasswordHash;
   /** Unidades fuera de servicio por fecha (YYYY-MM-DD). */
   maintenance: Maintenance;
 }
@@ -97,7 +84,6 @@ export function defaultSettings(): Settings {
   return {
     season: "baja",
     prices: structuredClone(DEFAULT_PRICES),
-    adminPasswordHash: { ...DEFAULT_ADMIN_PASSWORD_HASH },
     maintenance: {},
   };
 }

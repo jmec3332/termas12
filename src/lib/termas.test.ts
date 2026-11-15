@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { buildSampleData } from "./seed";
 import { buildPdf, buildIcs } from "./exports";
+import { DEFAULT_ADMIN_PASSWORD_HASH } from "./admin-default.server";
 import { hashPassword, verifyPassword } from "./password";
 import {
   aggregate,
   canCancel,
   capacityFor,
-  DEFAULT_ADMIN_PASSWORD_HASH,
   DEFAULT_PRICES,
   normalizePhone,
   priceFor,

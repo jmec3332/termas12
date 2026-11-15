@@ -8,7 +8,8 @@ export interface PasswordHash {
   iterations: number;
 }
 
-const ITERATIONS = 150_000;
+// El servidor (Cloudflare Workers) admite como máximo 100.000 iteraciones de PBKDF2.
+const ITERATIONS = 100_000;
 
 function toHex(buf: ArrayBuffer | Uint8Array): string {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");

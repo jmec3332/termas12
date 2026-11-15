@@ -31,6 +31,6 @@ use the editor.
 
 ## Project rules
 
-- All data lives in browser localStorage (`src/lib/store.ts`); no backend, Supabase or external clients — the client brief forbids them.
+- All booking data lives in browser localStorage (`src/lib/store.ts`); no database, Supabase or external clients — the client brief forbids them.
 - Booking rules are pure functions in `src/lib/termas.ts` so they stay unit-testable; UI must call them instead of re-implementing capacity logic.
-- The admin password is stored only as a PBKDF2 hash (`src/lib/password.ts`) and the session flag is bound to the current hash — never put the plaintext password in source or storage.
+- The admin password is verified only in server functions (`src/lib/admin-auth.*`) with an HttpOnly session cookie sealed by `ADMIN_SESSION_SECRET`; /admin and /graficos gate on `getAdminStatus` in `beforeLoad` — never move the check, password or its hash to client code or localStorage.
