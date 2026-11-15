@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 
+import { hashPassword, isPasswordHash, verifyPassword } from "./password";
 import { buildSampleData } from "./seed";
 import {
   canCancel,
@@ -60,12 +61,23 @@ function load(): TermasState {
     return { ready: true, bookings: sample.bookings, settings };
   }
   const base = defaultSettings();
+  // Versiones anteriores guardaban la clave en texto plano: se elimina y se migra a hash.
+  const { adminPassword: legacyPlain, ...rest } = storedSettings as Partial<Settings> & { adminPassword?: unknown };
   const settings: Settings = {
     ...base,
-    ...storedSettings,
-    prices: { ...base.prices, ...(storedSettings.prices ?? {}) },
-    maintenance: storedSettings.maintenance ?? {},
+    ...rest,
+    adminPasswordHash: isPasswordHash(rest.adminPasswordHash) ? rest.adminPasswordHash : base.adminPasswordHash,
+    prices: { ...base.prices, ...(rest.prices ?? {}) },
+    maintenance: rest.maintenance ?? {},
   };
+  if (legacyPlain !== undefined) {
+    persist({ bookings: storedBookings, settings });
+    if (typeof legacyPlain === "string" && legacyPlain && !isPasswordHash(rest.adminPasswordHash)) {
+      void hashPassword(legacyPlain).then((h) =>
+        update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPasswordHash: h } })),
+      );
+    }
+  }
   return { ready: true, bookings: storedBookings, settings };
 }
 
@@ -185,8 +197,12 @@ export function setPackagePrices(packageId: PackageId, prices: Record<Season, nu
   }));
 }
 
-export function setAdminPassword(password: string) {
-  update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPassword: password } }));
+export async function setAdminPassword(password: string) {
+  const adminPasswordHash = await hashPassword(password);
+  update((s) => ({ bookings: s.bookings, settings: { ...s.settings, adminPasswordHash } }));
+  // La sesión actual sigue activa con la clave nueva; las sesiones con la clave anterior caducan.
+  window.sessionStorage.setItem(SESSION_KEY, adminPasswordHash.hash);
+  emitSession();
 }
 
 export function toggleOutOfService(date: string, kind: ResourceKind, unit: number) {
@@ -220,30 +236,40 @@ export function restoreSampleData() {
 }
 
 // ---------- Sesión de administración (por pestaña) ----------
+// La sesión queda ligada al hash vigente: cambiar la clave invalida las sesiones anteriores.
 
 const sessionListeners = new Set<() => void>();
 
+function emitSession() {
+  sessionListeners.forEach((l) => l());
+}
+
 function subscribeSession(l: () => void) {
   sessionListeners.add(l);
-  return () => sessionListeners.delete(l);
+  const unsubscribeStore = subscribe(l);
+  return () => {
+    sessionListeners.delete(l);
+    unsubscribeStore();
+  };
 }
 
 export function useAdminSession(): boolean {
   return useSyncExternalStore(
     subscribeSession,
-    () => window.sessionStorage.getItem(SESSION_KEY) === "1",
+    () => window.sessionStorage.getItem(SESSION_KEY) === getSnapshot().settings.adminPasswordHash.hash,
     () => false,
   );
 }
 
-export function loginAdmin(password: string): boolean {
-  if (password !== getSnapshot().settings.adminPassword) return false;
-  window.sessionStorage.setItem(SESSION_KEY, "1");
-  sessionListeners.forEach((l) => l());
+export async function loginAdmin(password: string): Promise<boolean> {
+  const stored = getSnapshot().settings.adminPasswordHash;
+  if (!(await verifyPassword(password, stored))) return false;
+  window.sessionStorage.setItem(SESSION_KEY, stored.hash);
+  emitSession();
   return true;
 }
 
 export function logoutAdmin() {
   window.sessionStorage.removeItem(SESSION_KEY);
-  sessionListeners.forEach((l) => l());
+  emitSession();
 }

@@ -13,6 +13,7 @@ export function AdminGate({ title, children }: { title: string; children: ReactN
   const authed = useAdminSession();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
 
   if (!ready) return <Loading />;
   if (authed) return <>{children}</>;
@@ -21,9 +22,12 @@ export function AdminGate({ title, children }: { title: string; children: ReactN
     <div className="mx-auto max-w-sm px-4 py-12">
       <form
         className="rounded-2xl border bg-card p-6 shadow-card"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (loginAdmin(password)) setError("");
+          setChecking(true);
+          const ok = await loginAdmin(password);
+          setChecking(false);
+          if (ok) setError("");
           else setError("Clave incorrecta. Revisa e intenta de nuevo.");
         }}
       >
@@ -44,8 +48,8 @@ export function AdminGate({ title, children }: { title: string; children: ReactN
           />
           {error && <p className="text-sm font-bold text-destructive">{error}</p>}
         </div>
-        <Button type="submit" className="mt-5 w-full" size="lg">
-          Entrar
+        <Button type="submit" className="mt-5 w-full" size="lg" disabled={checking}>
+          {checking ? "Verificando…" : "Entrar"}
         </Button>
       </form>
     </div>

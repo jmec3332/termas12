@@ -467,11 +467,11 @@ function SettingsPanel() {
         <p className="text-xs text-muted-foreground">Sirve para entrar a Administración y a Gráficos.</p>
         <form
           className="mt-3 space-y-3"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (pwd.trim().length < 6) return setError("La clave debe tener al menos 6 caracteres.");
             if (pwd !== pwd2) return setError("Las claves no coinciden.");
-            setAdminPassword(pwd);
+            await setAdminPassword(pwd);
             setError("");
             setPwd("");
             setPwd2("");

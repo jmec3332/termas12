@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { buildSampleData } from "./seed";
 import { buildPdf, buildIcs } from "./exports";
+import { hashPassword, verifyPassword } from "./password";
 import {
   aggregate,
   canCancel,
   capacityFor,
-  DEFAULT_ADMIN_PASSWORD,
+  DEFAULT_ADMIN_PASSWORD_HASH,
   DEFAULT_PRICES,
   normalizePhone,
   priceFor,
@@ -109,8 +110,18 @@ describe("precios", () => {
     expect(priceFor(DEFAULT_PRICES, "alta", "completo")).toBe(25000);
   });
 
-  it("la clave inicial de administración es termas2026", () => {
-    expect(DEFAULT_ADMIN_PASSWORD).toBe("termas2026");
+  it("la clave inicial de administración es termas2026 y se guarda solo como hash", async () => {
+    expect(JSON.stringify(DEFAULT_ADMIN_PASSWORD_HASH)).not.toContain("termas2026");
+    expect(await verifyPassword("termas2026", DEFAULT_ADMIN_PASSWORD_HASH)).toBe(true);
+    expect(await verifyPassword("otra-clave", DEFAULT_ADMIN_PASSWORD_HASH)).toBe(false);
+  });
+
+  it("una clave nueva se verifica con su hash y lleva sal propia", async () => {
+    const a = await hashPassword("nueva-clave-1");
+    const b = await hashPassword("nueva-clave-1");
+    expect(a.salt).not.toBe(b.salt);
+    expect(await verifyPassword("nueva-clave-1", a)).toBe(true);
+    expect(await verifyPassword("termas2026", a)).toBe(false);
   });
 });
 
